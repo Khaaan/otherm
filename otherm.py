@@ -102,6 +102,11 @@ def get_args():
                              'imaginary should be ignored in calculating the'
                              'thermochemical contributions')
 
+    parser.add_argument('-sk', '--skip', type=float, default=1.0,
+                        help='Frequency cutoff (cm^-1); vibrational modes below'
+                             'this value are ignored in thermochemistry'
+                             '(default: 1.0)')
+
     return parser.parse_args()
 
 
@@ -815,13 +820,17 @@ class Molecule:
         # translational) and also remove the largest imaginary frequency if
         # this species is a transtion state
         excluded_n = 7 if self.is_ts else 6
+        vib_freqs = self.freqs[:-excluded_n]
 
         # Frequencies are sorted high -> low(negative)
         if self.real_freqs:
-            return [np.abs(freq) for freq in self.freqs[:-excluded_n]]
+            vib_freqs = [abs(freq) for freq in vib_freqs]
 
         else:
-            return [freq for freq in self.freqs[:-excluded_n] if freq > 0]
+            vib_freqs = [abs(freq) for freq in vib_freqs]
+
+        vib_freqs = [freq for freq in vib_freqs if freq >= self.skip]
+        return vib_freqs
 
     def calculate_mass(self):
         """Calculate the molecular mass of this molecule in kg"""
@@ -951,7 +960,7 @@ class Molecule:
 
         return None
 
-    def __init__(self, filename, is_ts=False, real_freqs=True):
+    def __init__(self, filename, is_ts=False, skip=1.0, real_freqs=True):
         """
         Molecule initialised from an ORCA output file
 
@@ -964,6 +973,9 @@ class Molecule:
 
         # Should all non-TS frequencies be made real (positive)
         self.real_freqs = real_freqs
+
+        # Too small frequencies should be skipped (as ORCA and xTB do)
+        self.skip = 1.0
 
         # Harmonic vibrational frequencies in cm-1
         self.freqs = extract_frequencies(filename)
@@ -999,7 +1011,8 @@ if __name__ == '__main__':
     args = get_args()
     mol = Molecule(args.filename,
                    is_ts=args.transition_state,
-                   real_freqs=args.real_freqs)
+                   skip=args.skip,
+                   real_freqs=args.real_freqs,)
 
     mol.calculate_thermochemistry(temp=args.temp,
                                   ss=args.standard_state,
@@ -1008,5 +1021,5 @@ if __name__ == '__main__':
                                   w0=args.w0,
                                   alpha=args.alpha,
                                   calc_sym=args.calc_sym,
-                                  symm_n=args.symn)
+                                  symm_n=args.symn,)
     print_output(mol)
