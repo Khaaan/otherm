@@ -825,9 +825,8 @@ class Molecule:
         # Frequencies are sorted high -> low(negative)
         if self.real_freqs:
             vib_freqs = [abs(freq) for freq in vib_freqs]
-
         else:
-            vib_freqs = [abs(freq) for freq in vib_freqs]
+            vib_freqs = [freq for freq in vib_freqs]
 
         vib_freqs = [freq for freq in vib_freqs if freq >= self.skip]
         return vib_freqs
