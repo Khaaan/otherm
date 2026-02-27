@@ -111,12 +111,12 @@ def print_output(molecule):
           "|                                                                                 |\n"
           "|          /$$$$$$  /$$$$$$$$ /$$   /$$ /$$$$$$$$ /$$$$$$$  /$$      /$$          |\n"
           "|         /$$__  $$|__  $$__/| $$  | $$| $$_____/| $$__  $$| $$$    /$$$          |\n"
-          "|        | $$  \ $$   | $$   | $$  | $$| $$      | $$  \ $$| $$$$  /$$$$          |\n"
+          "|        | $$  \\ $$   | $$   | $$  | $$| $$      | $$  \\ $$| $$$$  /$$$$          |\n"
           "|        | $$  | $$   | $$   | $$$$$$$$| $$$$$   | $$$$$$$/| $$ $$/$$ $$          |\n"
           "|        | $$  | $$   | $$   | $$__  $$| $$__/   | $$__  $$| $$  $$$| $$          |\n"
-          "|        | $$  | $$   | $$   | $$  | $$| $$      | $$  \ $$| $$\  $ | $$          |\n"
-          "|        |  $$$$$$/   | $$   | $$  | $$| $$$$$$$$| $$  | $$| $$ \/  | $$          |\n"
-          "|         \______/    |__/   |__/  |__/|________/|__/  |__/|__/     |__/          |\n"
+          "|        | $$  | $$   | $$   | $$  | $$| $$      | $$  \\ $$| $$\\  $ | $$          |\n"
+          "|        |  $$$$$$/   | $$   | $$  | $$| $$$$$$$$| $$  | $$| $$ \\/  | $$          |\n"
+          "|         \\______/    |__/   |__/  |__/|________/|__/  |__/|__/     |__/          |\n"
           "|                                                                                 |\n"
           "-----------------------------------------------------------------------------------\n\n")
 
@@ -427,7 +427,7 @@ def calc_symmetry_number(molecule, max_n_fold_rot_searched=6, dist_tol=0.25):
     :param dist_tol:
     :return:
     """
-    # Ensure the origin is at the center of mass
+    # Ensure the origin is at the centre of mass
     if np.max(molecule.com) > 0.1:
         molecule.shift_to_com()
 
@@ -466,7 +466,6 @@ def calc_symmetry_number(molecule, max_n_fold_rot_searched=6, dist_tol=0.25):
             return 1
 
     return sigma_r
-
 
 def calc_moments_of_inertia(xyz_list):
     """
@@ -534,14 +533,25 @@ def calc_q_rot_igm(molecule, temp):
     """
 
     i_mat = calc_moments_of_inertia(molecule.xyzs)
-    omega = Constants.h**2 / (8.0 * np.pi**2 * Constants.k_b * i_mat)
+
+    # Diagonalisation: obtain only diagonal elements
+    i_vals, _ = np.linalg.eigh(i_mat)
+    i_vals = np.sort(i_vals)
+    i_vals = np.clip(i_vals, 0.0, None)
+
+    omega = Constants.h**2 / (8.0 * np.pi**2 * Constants.k_b * i_vals)
 
     if molecule.n_atoms == 1:
         return 1
+    
+    # linear case
+    elif i_vals[0] / i_vals[1] < 1e-6:
+        omega_lin = omega[1] # omega[1] == omega[2] for linear
+        return temp / (molecule.sigma_r * omega_lin)
 
     else:
         # Product of the diagonal elements
-        omega_prod = omega[0, 0] * omega[1, 1] * omega[2, 2]
+        omega_prod = omega[0] * omega[1] * omega[2]
         return temp**1.5/molecule.sigma_r * np.sqrt(np.pi / omega_prod)
 
 
@@ -657,8 +667,16 @@ def calc_grimme_s_vib(molecule, temp, omega_0, alpha):
 
     i_mat = calc_moments_of_inertia(molecule.xyzs)
 
-    # Average I = (I_xx + I_yy + I_zz) / 3.0
-    b_avg = np.trace(i_mat) / 3.0
+    # Diagonalisation: obtain only diagonal elements
+    i_vals, _ = np.linalg.eigh(i_mat)
+    i_vals = np.sort(i_vals)
+    i_vals = np.clip(i_vals, 0.0, None)
+
+    if i_vals[0] / i_vals[1] < 1e-6:
+        b_avg = (i_vals[1] * i_vals[2]) ** (1. / 2.)
+        
+    else:
+        b_avg = (i_vals[0] * i_vals[1] * i_vals[2]) ** (1. / 3.)
 
     for freq in molecule.real_vib_freqs():
 
@@ -779,7 +797,7 @@ def calc_internal_energy(molecule, temp):
 class Molecule:
 
     def shift_to_com(self):
-        """Shift a molecules xyzs to the center of mass"""
+        """Shift a molecules xyzs to the centre of mass"""
 
         shifted_xyzs = []
 
@@ -815,7 +833,7 @@ class Molecule:
 
     def calculate_com(self):
         """
-        Calculate the center of mass (COM
+        Calculate the centre of mass (COM
 
         :return: (np.ndarray) COM vector
         """
@@ -957,12 +975,12 @@ class Molecule:
         # Mass in kg
         self.mass = self.calculate_mass()
 
-        # Matrix of I values in kg m^2
-        self.moments_of_inertia = calc_moments_of_inertia(self.xyzs)
-
         # Centre of mass np.array shape (3,) x/y/z in Å
         self.com = self.calculate_com()
         self.shift_to_com()
+
+        # Matrix of I values in kg m^2
+        self.moments_of_inertia = calc_moments_of_inertia(self.xyzs)
 
         # Rotational symmetry number
         self.sigma_r = 1
